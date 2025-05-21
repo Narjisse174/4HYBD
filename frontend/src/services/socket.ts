@@ -25,7 +25,7 @@ class SocketService {
 
   async connect() {
     if (this.socket?.connected) {
-      console.log('🔌 Socket déjà connecté');
+      console.log('Socket déjà connecté');
       return;
     }
 
@@ -34,12 +34,12 @@ class SocketService {
       const userId = await AsyncStorage.getItem('userId');
       
       if (!token || !userId) {
-        console.log('❌ Pas de token ou userId trouvé');
+        console.log('Pas de token ou userId trouvé');
         return;
       }
 
       this.userId = userId;
-      console.log('🔌 Tentative de connexion au socket...');
+      console.log('Tentative de connexion au socket...');
       
       this.socket = io(SOCKET_URL!, {
         auth: { token },
@@ -51,11 +51,10 @@ class SocketService {
 
       this.setupSocketListeners();
       
-      // Notifier le serveur de la connexion de l'utilisateur
       this.socket.emit('user_connected', userId);
       
     } catch (error) {
-      console.error('❌ Erreur lors de la connexion au socket:', error);
+      console.error('Erreur lors de la connexion au socket:', error);
     }
   }
 
@@ -63,33 +62,33 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket connecté');
+      console.log('Socket connecté');
     });
 
     this.socket.on('disconnect', () => {
-      console.log('❌ Socket déconnecté');
+      console.log('Socket déconnecté');
     });
 
     this.socket.on('connection_confirmed', (data) => {
-      console.log('✅ Connexion confirmée:', data);
+      console.log('Connexion confirmée:', data);
     });
 
     this.socket.on('error', (error) => {
-      console.error('❌ Erreur socket:', error);
+      console.error('Erreur socket:', error);
     });
 
     this.socket.on('message_sent', (data) => {
-      console.log('✅ Message envoyé avec succès:', data);
+      console.log('Message envoyé avec succès:', data);
     });
 
     this.socket.on('message_error', (error) => {
-      console.error('❌ Erreur lors de l\'envoi du message:', error);
+      console.error('Erreur lors de l\'envoi du message:', error);
     });
   }
 
   disconnect() {
     if (this.socket) {
-      console.log('👋 Déconnexion du socket...');
+      console.log('Déconnexion du socket...');
       this.socket.disconnect();
       this.socket = null;
       this.userId = null;
@@ -98,23 +97,23 @@ class SocketService {
 
   emit(event: string, data: any) {
     if (this.socket) {
-      console.log(`📤 Émission de l'événement ${event}:`, data);
+      console.log(`Émission de l'événement ${event}:`, data);
       this.socket.emit(event, data);
     } else {
-      console.warn('⚠️ Tentative d\'émission sans socket connecté');
+      console.warn('Tentative d\'émission sans socket connecté');
     }
   }
 
   on(event: string, callback: (data: any) => void) {
     if (this.socket) {
-      console.log(`👂 Écoute de l'événement ${event}`);
+      console.log(`Écoute de l'événement ${event}`);
       this.socket.on(event, callback);
     }
   }
 
   off(event: string) {
     if (this.socket) {
-      console.log(`🔕 Arrêt de l'écoute de l'événement ${event}`);
+      console.log(`Arrêt de l'écoute de l'événement ${event}`);
       this.socket.off(event);
     }
   }

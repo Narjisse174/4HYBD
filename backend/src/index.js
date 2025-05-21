@@ -24,24 +24,24 @@ app.use(express.urlencoded({ extended: true }));
 // Connexion à MongoDB
 const connectDB = async () => {
   try {
-    console.log('🔄 Tentative de connexion à MongoDB...');
-    const conn = await mongoose.connect('mongodb://127.0.0.1:27017/snapshoot', {
+    console.log('Tentative de connexion à MongoDB...');
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/snapshoot';
+    const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout après 5 secondes
-      socketTimeoutMS: 45000, // Timeout des opérations après 45 secondes
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
-    console.log(`✅ MongoDB connecté: ${conn.connection.host}`);
-    console.log(`📁 Base de données: ${conn.connection.name}`);
+    console.log(`MongoDB connecté: ${conn.connection.host}`);
+    console.log(`Base de données: ${conn.connection.name}`);
     
-    // Vérifier les collections existantes
     const collections = await conn.connection.db.listCollections().toArray();
-    console.log('📚 Collections existantes:', collections.map(c => c.name));
+    console.log('Collections existantes:', collections.map(c => c.name));
     
   } catch (error) {
-    console.error('❌ Erreur de connexion à MongoDB:', error.message);
+    console.error('Erreur de connexion à MongoDB:', error.message);
     console.error('Détails de l\'erreur:', error);
-    process.exit(1); // Arrêter l'application en cas d'échec de connexion
+    process.exit(1);
   }
 };
 
@@ -51,35 +51,47 @@ connectDB();
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log('🔌 Nouvelle connexion socket:', socket.id);
+  console.log('Nouvelle connexion socket:', socket.id);
 
   socket.on('user_connected', (userId) => {
-    console.log(`👤 Utilisateur ${userId} connecté avec socket ${socket.id}`);
+    if (!userId) {
+      console.error('Tentative de connexion sans userId');
+      socket.emit('error', { message: 'UserId requis' });
+      return;
+    }
+
+    console.log(`Utilisateur ${userId} connecté avec socket ${socket.id}`);
     connectedUsers.set(userId, socket.id);
-    
-    // Émettre un événement de confirmation
     socket.emit('connection_confirmed', { userId, socketId: socket.id });
   });
 
   socket.on('send_message', async (data) => {
-    console.log('📨 Message reçu:', data);
-    const recipientSocketId = connectedUsers.get(data.recipientId);
-    
-    if (recipientSocketId) {
-      console.log(`📤 Envoi du message à ${data.recipientId} (socket: ${recipientSocketId})`);
-      io.to(recipientSocketId).emit('new_message', data);
-      // Confirmer l'envoi à l'expéditeur
-      socket.emit('message_sent', { messageId: data._id });
-    } else {
-      console.log(`⚠️ Destinataire ${data.recipientId} non connecté`);
-      socket.emit('message_error', { error: 'Destinataire non connecté' });
+    try {
+      if (!data || !data.recipientId) {
+        throw new Error('Données de message invalides');
+      }
+
+      console.log('Message reçu:', data);
+      const recipientSocketId = connectedUsers.get(data.recipientId);
+      
+      if (recipientSocketId) {
+        console.log(`Envoi du message à ${data.recipientId} (socket: ${recipientSocketId})`);
+        io.to(recipientSocketId).emit('new_message', data);
+        socket.emit('message_sent', { messageId: data._id });
+      } else {
+        console.log(`Destinataire ${data.recipientId} non connecté`);
+        socket.emit('message_error', { error: 'Destinataire non connecté' });
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi du message:', error);
+      socket.emit('message_error', { error: error.message });
     }
   });
 
   socket.on('disconnect', () => {
     for (const [userId, socketId] of connectedUsers.entries()) {
       if (socketId === socket.id) {
-        console.log(`👋 Utilisateur ${userId} déconnecté`);
+        console.log(`Utilisateur ${userId} déconnecté`);
         connectedUsers.delete(userId);
         break;
       }
@@ -106,4 +118,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
+  console.log(`Environnement: ${process.env.NODE_ENV || 'development'}`);
 }); 
