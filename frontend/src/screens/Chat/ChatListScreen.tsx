@@ -40,25 +40,29 @@ const ChatListScreen = () => {
 
   const loadConversations = async () => {
     try {
-      // TODO: Implémenter la récupération des conversations
-      // const response = await messageService.getConversations();
-      // setConversations(response.data);
+      console.log('🔄 Chargement des conversations...');
+      const response = await messageService.getConversations();
+      console.log('✅ Conversations reçues:', response);
+      setConversations(response);
     } catch (error) {
-      console.error('Erreur lors du chargement des conversations:', error);
+      console.error('❌ Erreur lors du chargement des conversations:', error);
     }
   };
 
   const onRefresh = async () => {
+    console.log('🔄 Rafraîchissement des conversations...');
     setRefreshing(true);
     await loadConversations();
     setRefreshing(false);
   };
 
   useEffect(() => {
+    console.log('🚀 Initialisation du ChatListScreen');
     loadConversations();
   }, []);
 
   const renderConversation = ({ item }: { item: Conversation }) => {
+    console.log('🎨 Rendu de la conversation:', item);
     const otherParticipant = item.participants[0]; // À adapter selon la logique de votre application
 
     return (

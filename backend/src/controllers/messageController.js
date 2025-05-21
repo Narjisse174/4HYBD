@@ -128,4 +128,57 @@ exports.getUnreadMessages = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Erreur lors de la récupération des messages non lus', error: error.message });
   }
+};
+
+// Récupérer toutes les conversations de l'utilisateur
+exports.getConversations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('🔍 Recherche des conversations pour l\'utilisateur:', userId);
+
+    // Trouver tous les messages où l'utilisateur est soit l'expéditeur soit le destinataire
+    const messages = await Message.find({
+      $or: [
+        { sender: userId },
+        { recipients: userId }
+      ]
+    })
+    .sort({ createdAt: -1 })
+    .populate('sender', 'username profilePicture')
+    .populate('recipients', 'username profilePicture');
+
+    console.log('📨 Messages trouvés:', messages.length);
+
+    // Grouper les messages par conversation
+    const conversations = messages.reduce((acc, message) => {
+      const otherUser = message.sender._id.toString() === userId 
+        ? message.recipients[0] 
+        : message.sender;
+
+      console.log('👥 Traitement du message avec l\'utilisateur:', otherUser.username);
+
+      if (!acc[otherUser._id]) {
+        acc[otherUser._id] = {
+          _id: otherUser._id,
+          participants: [otherUser],
+          lastMessage: {
+            content: message.content,
+            createdAt: message.createdAt,
+            sender: message.sender._id.toString()
+          },
+          unreadCount: message.readBy.some(read => read.user.toString() === userId) ? 0 : 1
+        };
+        console.log('💬 Nouvelle conversation créée pour:', otherUser.username);
+      }
+
+      return acc;
+    }, {});
+
+    const conversationsList = Object.values(conversations);
+    console.log('📱 Conversations finales:', conversationsList.length);
+    res.json(conversationsList);
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération des conversations:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des conversations', error: error.message });
+  }
 }; 

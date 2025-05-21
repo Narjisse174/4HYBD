@@ -50,9 +50,11 @@ const LoginScreen = () => {
 
     try {
       setLoading(true);
-      await authService.login(email, password);
+      const authState = await authService.login(email, password);
+      console.log('✅ État d\'authentification après connexion:', authState);
       // La navigation sera gérée par le système d'authentification
     } catch (error) {
+      console.error('❌ Erreur de connexion:', error);
       Alert.alert(
         'Erreur de connexion',
         'Vérifiez vos identifiants et réessayez.'

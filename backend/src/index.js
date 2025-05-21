@@ -24,15 +24,22 @@ app.use(express.urlencoded({ extended: true }));
 // Connexion à MongoDB
 const connectDB = async () => {
   try {
+    console.log('🔄 Tentative de connexion à MongoDB...');
     const conn = await mongoose.connect('mongodb://127.0.0.1:27017/snapshoot', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000, // Timeout après 5 secondes
       socketTimeoutMS: 45000, // Timeout des opérations après 45 secondes
     });
-    console.log(`MongoDB connecté: ${conn.connection.host}`);
+    console.log(`✅ MongoDB connecté: ${conn.connection.host}`);
+    console.log(`📁 Base de données: ${conn.connection.name}`);
+    
+    // Vérifier les collections existantes
+    const collections = await conn.connection.db.listCollections().toArray();
+    console.log('📚 Collections existantes:', collections.map(c => c.name));
+    
   } catch (error) {
-    console.error('Erreur de connexion à MongoDB:', error.message);
+    console.error('❌ Erreur de connexion à MongoDB:', error.message);
     console.error('Détails de l\'erreur:', error);
     process.exit(1); // Arrêter l'application en cas d'échec de connexion
   }
@@ -44,25 +51,36 @@ connectDB();
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log('Nouvel utilisateur connecté');
+  console.log('🔌 Nouvelle connexion socket:', socket.id);
 
   socket.on('user_connected', (userId) => {
+    console.log(`👤 Utilisateur ${userId} connecté avec socket ${socket.id}`);
     connectedUsers.set(userId, socket.id);
-    console.log(`Utilisateur ${userId} connecté`);
+    
+    // Émettre un événement de confirmation
+    socket.emit('connection_confirmed', { userId, socketId: socket.id });
   });
 
   socket.on('send_message', async (data) => {
+    console.log('📨 Message reçu:', data);
     const recipientSocketId = connectedUsers.get(data.recipientId);
+    
     if (recipientSocketId) {
+      console.log(`📤 Envoi du message à ${data.recipientId} (socket: ${recipientSocketId})`);
       io.to(recipientSocketId).emit('new_message', data);
+      // Confirmer l'envoi à l'expéditeur
+      socket.emit('message_sent', { messageId: data._id });
+    } else {
+      console.log(`⚠️ Destinataire ${data.recipientId} non connecté`);
+      socket.emit('message_error', { error: 'Destinataire non connecté' });
     }
   });
 
   socket.on('disconnect', () => {
     for (const [userId, socketId] of connectedUsers.entries()) {
       if (socketId === socket.id) {
+        console.log(`👋 Utilisateur ${userId} déconnecté`);
         connectedUsers.delete(userId);
-        console.log(`Utilisateur ${userId} déconnecté`);
         break;
       }
     }

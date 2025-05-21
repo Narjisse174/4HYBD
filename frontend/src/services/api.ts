@@ -22,7 +22,7 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('token');
       if (token) {
         console.log('🔑 Token trouvé, ajout aux headers');
         config.headers.Authorization = `Bearer ${token}`;
@@ -51,8 +51,8 @@ api.interceptors.response.use(
     console.error('❌ Erreur de réponse:', error.response?.status, error.response?.data);
     if (error.response?.status === 401) {
       console.log('🔒 Session expirée, déconnexion...');
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
     }
     return Promise.reject(error);
   }
@@ -78,28 +78,45 @@ export const authService = {
 
 // Service de messages
 export const messageService = {
-  sendMessage: async (messageData: { recipientId: string; content: string; mediaUrl?: string; mediaType?: string }) => {
-    const response = await api.post('/messages/send', messageData);
+  sendMessage: async (recipientId: string, messageData: { content: string; mediaUrl?: string; mediaType?: string }) => {
+    console.log('📤 Envoi d\'un message à:', recipientId, messageData);
+    const response = await api.post('/messages/send', { recipientId, ...messageData });
+    console.log('✅ Message envoyé avec succès:', response.data);
     return response.data;
   },
 
   sendGroupMessage: async (messageData: { recipientIds: string[]; content: string; mediaUrl?: string; mediaType?: string }) => {
+    console.log('📤 Envoi d\'un message de groupe à:', messageData.recipientIds);
     const response = await api.post('/messages/group/send', messageData);
+    console.log('✅ Message de groupe envoyé avec succès:', response.data);
     return response.data;
   },
 
   getConversation: async (userId: string) => {
+    console.log('📥 Récupération de la conversation avec:', userId);
     const response = await api.get(`/messages/conversation/${userId}`);
+    console.log('✅ Conversation reçue:', response.data);
+    return response.data;
+  },
+
+  getConversations: async () => {
+    console.log('📥 Récupération de toutes les conversations');
+    const response = await api.get('/messages/conversations');
+    console.log('✅ Conversations reçues:', response.data);
     return response.data;
   },
 
   getUnreadMessages: async () => {
+    console.log('📥 Récupération des messages non lus');
     const response = await api.get('/messages/unread');
+    console.log('✅ Messages non lus reçus:', response.data);
     return response.data;
   },
 
   markAsRead: async (messageId: string) => {
+    console.log('📝 Marquage du message comme lu:', messageId);
     const response = await api.put(`/messages/read/${messageId}`);
+    console.log('✅ Message marqué comme lu:', response.data);
     return response.data;
   },
 };

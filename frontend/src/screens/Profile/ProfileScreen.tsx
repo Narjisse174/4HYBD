@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -83,9 +84,9 @@ const ProfileScreen = () => {
           style={styles.menuItem}
           onPress={handleUpdateProfile}
         >
-          <Icon name="person-outline" size={24} color="#007AFF" />
+          <Icon name="create-outline" size={24} color="#007AFF" />
           <Text style={styles.menuText}>Modifier le profil</Text>
-          <Icon name="chevron-forward" size={24} color="#999" />
+          <Icon name="chevron-forward" size={24} color="#C7C7CC" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
@@ -112,8 +113,14 @@ const ProfileScreen = () => {
         onPress={handleLogout}
         disabled={loading}
       >
-        <Icon name="log-out-outline" size={24} color="#FF3B30" />
-        <Text style={styles.logoutText}>Se déconnecter</Text>
+        {loading ? (
+          <ActivityIndicator size="small" color="#FF3B30" />
+        ) : (
+          <>
+            <Icon name="log-out-outline" size={24} color="#FF3B30" />
+            <Text style={styles.logoutText}>Se déconnecter</Text>
+          </>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );

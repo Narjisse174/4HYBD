@@ -32,7 +32,12 @@ type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 interface Message {
   _id: string;
   content: string;
-  sender: string;
+  sender: {
+    _id: string;
+    username: string;
+    profilePicture?: string;
+  };
+  recipients: string[];
   createdAt: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video';
@@ -58,10 +63,11 @@ const ChatScreen = () => {
   const loadMessages = async () => {
     try {
       setLoading(true);
-      const response = await messageService.getConversationMessages(userId);
-      setMessages(response.data);
+      const response = await messageService.getConversation(userId);
+      console.log('📥 Messages reçus:', response);
+      setMessages(response);
     } catch (error) {
-      console.error('Erreur lors du chargement des messages:', error);
+      console.error('❌ Erreur lors du chargement des messages:', error);
       Alert.alert('Erreur', 'Impossible de charger les messages');
     } finally {
       setLoading(false);
@@ -79,10 +85,33 @@ const ChatScreen = () => {
   };
 
   const setupSocketListeners = () => {
-    socketService.on('newMessage', (message: Message) => {
-      if (message.sender === userId) {
-        setMessages(prev => [...prev, message]);
+    console.log('🔌 Configuration des écouteurs socket...');
+    
+    socketService.on('new_message', (message: Message) => {
+      console.log('📨 Nouveau message reçu:', message);
+      if (message.sender._id === userId || message.recipients.includes(userId)) {
+        console.log('✅ Message ajouté à la conversation');
+        setMessages(prev => {
+          const newMessages = [...prev, message];
+          // Trier les messages par date
+          return newMessages.sort((a, b) => 
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        });
+        // Faire défiler vers le dernier message
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       }
+    });
+
+    socketService.on('message_sent', (data) => {
+      console.log('✅ Message envoyé avec succès:', data);
+    });
+
+    socketService.on('message_error', (error) => {
+      console.error('❌ Erreur lors de l\'envoi du message:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message');
     });
   };
 
@@ -124,11 +153,12 @@ const ChatScreen = () => {
         mediaType,
       });
 
-      setMessages(prev => [...prev, response.data]);
+      console.log('✅ Message envoyé:', response);
+      setMessages(prev => [...prev, response]);
       setNewMessage('');
       flatListRef.current?.scrollToEnd();
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
+      console.error('❌ Erreur lors de l\'envoi du message:', error);
       Alert.alert('Erreur', 'Impossible d\'envoyer le message');
     } finally {
       setUploading(false);
@@ -136,7 +166,7 @@ const ChatScreen = () => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isOwnMessage = item.sender !== userId;
+    const isOwnMessage = item.sender._id === userId;
     const messageDate = new Date(item.createdAt).toLocaleTimeString();
 
     return (
@@ -144,6 +174,9 @@ const ChatScreen = () => {
         styles.messageContainer,
         isOwnMessage ? styles.ownMessage : styles.otherMessage
       ]}>
+        {!isOwnMessage && (
+          <Text style={styles.senderName}>{item.sender.username}</Text>
+        )}
         {item.mediaUrl && (
           <View style={styles.mediaContainer}>
             {item.mediaType === 'image' ? (
@@ -314,6 +347,11 @@ const styles = StyleSheet.create({
   videoText: {
     color: '#FFF',
     marginTop: 8,
+  },
+  senderName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
   },
 });
 

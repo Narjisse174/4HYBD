@@ -61,13 +61,8 @@ class AuthService {
           location: response.location || { type: 'Point', coordinates: [0, 0] }
         };
         
-        await AsyncStorage.setItem('token', response.token);
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-        
-        this.token = response.token;
-        this.currentUser = userData;
-        
-        console.log('✅ Token et données utilisateur sauvegardés');
+        await this.setAuthState({ token: response.token, user: userData });
+        console.log('✅ État d\'authentification mis à jour après connexion');
       }
       
       return this.getAuthState();
