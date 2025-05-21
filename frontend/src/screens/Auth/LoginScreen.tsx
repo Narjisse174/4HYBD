@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import {
   View,
+  Text,
+  TextInput,
+  TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Alert,
+  ScrollView
 } from 'react-native';
-import Input from '../../components/common/Input';
-import Button from '../../components/common/Button';
-import authService from '../../services/auth';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
+  Login: undefined;
   Register: undefined;
 };
 
@@ -21,44 +24,26 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const LoginScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-
-  const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
-
-    if (!email) {
-      newErrors.email = 'L\'email est requis';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Format d\'email invalide';
-    }
-
-    if (!password) {
-      newErrors.password = 'Le mot de passe est requis';
-    } else if (password.length < 6) {
-      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   const handleLogin = async () => {
-    if (!validateForm()) return;
+    if (!email || !password) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
 
     try {
+      console.log('🔑 Tentative de connexion avec:', { email });
       setLoading(true);
-      const authState = await authService.login(email, password);
-      console.log('✅ État d\'authentification après connexion:', authState);
-      // La navigation sera gérée par le système d'authentification
-    } catch (error) {
+      await login(email, password);
+      console.log('✅ Connexion réussie');
+    } catch (error: any) {
       console.error('❌ Erreur de connexion:', error);
-      Alert.alert(
-        'Erreur de connexion',
-        'Vérifiez vos identifiants et réessayez.'
-      );
+      const errorMessage = error.response?.data?.message || error.message || 'Une erreur est survenue';
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -69,43 +54,58 @@ const LoginScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Bienvenue</Text>
+          <Text style={styles.subtitle}>Connectez-vous pour continuer</Text>
+        </View>
+
         <View style={styles.form}>
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Entrez votre email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+          </View>
 
-          <Input
-            label="Mot de passe"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Entrez votre mot de passe"
-            secureTextEntry
-            error={errors.password}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Mot de passe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre mot de passe"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password"
+            />
+          </View>
 
-          <Button
-            title="Se connecter"
+          <TouchableOpacity
+            style={styles.loginButton}
             onPress={handleLogin}
-            loading={loading}
-            style={styles.button}
-          />
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Se connecter</Text>
+            )}
+          </TouchableOpacity>
 
-          <Button
-            title="Créer un compte"
+          <TouchableOpacity
+            style={styles.registerButton}
             onPress={() => navigation.navigate('Register')}
-            variant="outline"
-            style={styles.button}
-          />
+          >
+            <Text style={styles.registerButtonText}>
+              Pas encore de compte ? S'inscrire
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -115,20 +115,64 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F7',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
     padding: 20,
   },
-  form: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
+  header: {
+    marginTop: 60,
+    marginBottom: 40,
   },
-  button: {
-    marginTop: 16,
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  form: {
+    gap: 20,
+  },
+  inputContainer: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  input: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 10,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  loginButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  loginButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  registerButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  registerButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
 });
 

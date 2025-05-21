@@ -1,85 +1,76 @@
 import React, { useState } from 'react';
 import {
   View,
+  Text,
+  TextInput,
+  TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Alert,
+  ScrollView
 } from 'react-native';
-import Input from '../../components/common/Input';
-import Button from '../../components/common/Button';
-import authService from '../../services/auth';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const RegisterScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { register } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{
-    username?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
-
-  const validateForm = () => {
-    const newErrors: {
-      username?: string;
-      email?: string;
-      password?: string;
-      confirmPassword?: string;
-    } = {};
-
-    if (!username) {
-      newErrors.username = 'Le nom d\'utilisateur est requis';
-    } else if (username.length < 3) {
-      newErrors.username = 'Le nom d\'utilisateur doit contenir au moins 3 caractères';
-    }
-
-    if (!email) {
-      newErrors.email = 'L\'email est requis';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Format d\'email invalide';
-    }
-
-    if (!password) {
-      newErrors.password = 'Le mot de passe est requis';
-    } else if (password.length < 6) {
-      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
-    }
-
-    if (!confirmPassword) {
-      newErrors.confirmPassword = 'La confirmation du mot de passe est requise';
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   const handleRegister = async () => {
-    if (!validateForm()) return;
+    if (!username || !email || !password || !confirmPassword) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    // Validation supplémentaire
+    if (username.length < 3) {
+      Alert.alert('Erreur', 'Le nom d\'utilisateur doit contenir au moins 3 caractères');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      Alert.alert('Erreur', 'Format d\'email invalide');
+      return;
+    }
 
     try {
       setLoading(true);
-      await authService.register(email, password, username);
-      // La navigation sera gérée par le système d'authentification
-    } catch (error) {
+      console.log('📝 Tentative d\'inscription avec:', {
+        email,
+        username,
+        passwordLength: password.length
+      });
+      await register(email, password, username);
+    } catch (error: any) {
+      console.error('❌ Erreur d\'inscription:', error.response?.data || error.message);
       Alert.alert(
         'Erreur d\'inscription',
-        'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.'
+        error.response?.data?.message || 'Impossible de créer le compte'
       );
     } finally {
       setLoading(false);
@@ -91,61 +82,82 @@ const RegisterScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Créer un compte</Text>
+          <Text style={styles.subtitle}>Rejoignez notre communauté</Text>
+        </View>
+
         <View style={styles.form}>
-          <Input
-            label="Nom d'utilisateur"
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Choisissez un nom d'utilisateur"
-            autoCapitalize="none"
-            error={errors.username}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Nom d'utilisateur</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre nom d'utilisateur"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoComplete="username"
+            />
+          </View>
 
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Entrez votre email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+          </View>
 
-          <Input
-            label="Mot de passe"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Créez un mot de passe"
-            secureTextEntry
-            error={errors.password}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Mot de passe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Votre mot de passe"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password-new"
+            />
+          </View>
 
-          <Input
-            label="Confirmer le mot de passe"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirmez votre mot de passe"
-            secureTextEntry
-            error={errors.confirmPassword}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Confirmer le mot de passe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirmez votre mot de passe"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoComplete="password-new"
+            />
+          </View>
 
-          <Button
-            title="S'inscrire"
+          <TouchableOpacity
+            style={styles.registerButton}
             onPress={handleRegister}
-            loading={loading}
-            style={styles.button}
-          />
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.registerButtonText}>S'inscrire</Text>
+            )}
+          </TouchableOpacity>
 
-          <Button
-            title="Déjà un compte ? Se connecter"
-            onPress={() => navigation.navigate('Login')}
-            variant="outline"
-            style={styles.button}
-          />
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.loginButtonText}>
+              Déjà un compte ? Se connecter
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -155,20 +167,64 @@ const RegisterScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F7',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
     padding: 20,
   },
-  form: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
+  header: {
+    marginTop: 60,
+    marginBottom: 40,
   },
-  button: {
-    marginTop: 16,
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  form: {
+    gap: 20,
+  },
+  inputContainer: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  input: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 10,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  registerButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  registerButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
 });
 

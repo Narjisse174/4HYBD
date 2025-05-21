@@ -5,11 +5,12 @@ export interface User {
   _id: string;
   email: string;
   username: string;
-  profilePicture?: string;
-  location?: {
+  profilePicture: string;
+  location: {
     type: string;
     coordinates: [number, number];
   };
+  bio: string;
 }
 
 export interface AuthState {
@@ -52,18 +53,24 @@ class AuthService {
       const response = await authService.login({ email, password });
       console.log('✅ Réponse du serveur:', response);
       
-      if (response.token) {
-        const userData = {
-          _id: response._id,
-          email: response.email,
-          username: response.username,
-          profilePicture: response.profilePicture || '',
-          location: response.location || { type: 'Point', coordinates: [0, 0] }
-        };
-        
-        await this.setAuthState({ token: response.token, user: userData });
-        console.log('✅ État d\'authentification mis à jour après connexion');
+      if (!response || !response.token || !response._id) {
+        console.error('❌ Réponse invalide du serveur:', response);
+        throw new Error('Réponse invalide du serveur');
       }
+
+      const userData: User = {
+        _id: response._id,
+        email: response.email,
+        username: response.username,
+        profilePicture: response.profilePicture || '',
+        location: response.location || { type: 'Point', coordinates: [0, 0] },
+        bio: response.bio || ''
+      };
+
+      console.log('👤 Données utilisateur préparées:', userData);
+      
+      await this.setAuthState({ token: response.token, user: userData });
+      console.log('✅ État d\'authentification mis à jour après connexion');
       
       return this.getAuthState();
     } catch (error: any) {
@@ -78,10 +85,24 @@ class AuthService {
       const response = await authService.register({ email, password, username });
       console.log('✅ Réponse du serveur:', response);
       
-      if (response.token) {
-        await this.setAuthState(response);
-        console.log('✅ Token et données utilisateur sauvegardés');
+      if (!response || !response.token || !response._id) {
+        console.error('❌ Réponse invalide du serveur:', response);
+        throw new Error('Réponse invalide du serveur');
       }
+
+      const userData: User = {
+        _id: response._id,
+        email: response.email,
+        username: response.username,
+        profilePicture: response.profilePicture || '',
+        location: response.location || { type: 'Point', coordinates: [0, 0] },
+        bio: response.bio || ''
+      };
+
+      console.log('👤 Données utilisateur préparées:', userData);
+      
+      await this.setAuthState({ token: response.token, user: userData });
+      console.log('✅ État d\'authentification mis à jour après inscription');
       
       return this.getAuthState();
     } catch (error: any) {
@@ -117,11 +138,32 @@ class AuthService {
 
   private async setAuthState(data: { token: string; user: User }) {
     try {
+      if (!data.token || !data.user) {
+        console.error('❌ Données d\'authentification invalides:', data);
+        throw new Error('Données d\'authentification invalides');
+      }
+
+      console.log('💾 Sauvegarde des données d\'authentification:', {
+        token: data.token.substring(0, 10) + '...',
+        user: data.user
+      });
+
+      // S'assurer que les données sont valides avant de les sauvegarder
+      const userData = {
+        _id: data.user._id,
+        email: data.user.email,
+        username: data.user.username,
+        profilePicture: data.user.profilePicture || '',
+        location: data.user.location || { type: 'Point', coordinates: [0, 0] },
+        bio: data.user.bio || ''
+      };
+
       this.token = data.token;
-      this.currentUser = data.user;
+      this.currentUser = userData;
       
+      // Sauvegarder les données dans AsyncStorage
       await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
       
       console.log('✅ État d\'authentification mis à jour');
     } catch (error) {

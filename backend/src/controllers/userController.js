@@ -55,6 +55,9 @@ exports.register = async (req, res) => {
       _id: user._id,
       email: user.email,
       username: user.username,
+      profilePicture: user.profilePicture || '',
+      location: user.location || { type: 'Point', coordinates: [0, 0] },
+      bio: user.bio || '',
       token
     });
   } catch (error) {
@@ -93,6 +96,9 @@ exports.login = async (req, res) => {
       _id: user._id,
       email: user.email,
       username: user.username,
+      profilePicture: user.profilePicture || '',
+      location: user.location || { type: 'Point', coordinates: [0, 0] },
+      bio: user.bio || '',
       token
     });
   } catch (error) {
@@ -206,5 +212,125 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la réinitialisation du mot de passe:', error);
     res.status(500).json({ message: 'Erreur lors de la réinitialisation du mot de passe' });
+  }
+};
+
+// Supprimer le profil utilisateur
+exports.deleteProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await User.findByIdAndDelete(userId);
+    res.json({ message: 'Profil supprimé avec succès' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la suppression du profil', error: error.message });
+  }
+};
+
+// Envoyer une demande d'ami
+exports.sendFriendRequest = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUser = await User.findById(req.user.id);
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Vérifier si une demande existe déjà
+    const existingRequest = targetUser.friendRequests.find(
+      request => request.from.toString() === req.user.id
+    );
+
+    if (existingRequest) {
+      return res.status(400).json({ message: 'Une demande d\'ami existe déjà' });
+    }
+
+    // Ajouter la demande
+    targetUser.friendRequests.push({
+      from: req.user.id,
+      status: 'pending'
+    });
+
+    await targetUser.save();
+    res.json({ message: 'Demande d\'ami envoyée' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de l\'envoi de la demande d\'ami', error: error.message });
+  }
+};
+
+// Gérer une demande d'ami (accepter/rejeter)
+exports.handleFriendRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { action } = req.body; // 'accept' ou 'reject'
+    const currentUser = await User.findById(req.user.id);
+
+    const request = currentUser.friendRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ message: 'Demande non trouvée' });
+    }
+
+    if (action === 'accept') {
+      // Ajouter aux amis des deux côtés
+      currentUser.friends.push(request.from);
+      const otherUser = await User.findById(request.from);
+      otherUser.friends.push(currentUser._id);
+      await otherUser.save();
+    }
+
+    // Mettre à jour le statut de la demande
+    request.status = action === 'accept' ? 'accepted' : 'rejected';
+    await currentUser.save();
+
+    res.json({ message: `Demande ${action === 'accept' ? 'acceptée' : 'rejetée'}` });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors du traitement de la demande d\'ami', error: error.message });
+  }
+};
+
+// Obtenir la liste des amis
+exports.getFriends = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate('friends', 'username profilePicture');
+    res.json(user.friends);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la récupération des amis', error: error.message });
+  }
+};
+
+// Obtenir les demandes d'amis
+exports.getFriendRequests = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate('friendRequests.from', 'username profilePicture');
+    res.json(user.friendRequests);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la récupération des demandes d\'amis', error: error.message });
+  }
+};
+
+// Supprimer un ami
+exports.removeFriend = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUser = await User.findById(req.user.id);
+    const otherUser = await User.findById(userId);
+
+    // Supprimer des deux côtés
+    currentUser.friends = currentUser.friends.filter(
+      friend => friend.toString() !== userId
+    );
+    otherUser.friends = otherUser.friends.filter(
+      friend => friend.toString() !== req.user.id
+    );
+
+    await currentUser.save();
+    await otherUser.save();
+
+    res.json({ message: 'Ami supprimé avec succès' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la suppression de l\'ami', error: error.message });
   }
 }; 

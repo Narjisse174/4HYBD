@@ -21,6 +21,10 @@ const userSchema = new mongoose.Schema({
   },
   profilePicture: {
     type: String,
+    default: null
+  },
+  bio: {
+    type: String,
     default: ''
   },
   location: {
@@ -37,6 +41,21 @@ const userSchema = new mongoose.Schema({
   friends: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+  friendRequests: [{
+    from: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'rejected'],
+      default: 'pending'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
   }],
   createdAt: {
     type: Date,

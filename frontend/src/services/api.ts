@@ -18,28 +18,14 @@ const api = axios.create({
   }
 });
 
-// Intercepteur pour ajouter le token d'authentification
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        console.log('🔑 Token trouvé, ajout aux headers');
-        config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        console.log('⚠️ Pas de token trouvé');
-      }
-      return config;
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'ajout du token:', error);
-      return config;
-    }
-  },
-  (error) => {
-    console.error('❌ Erreur dans l\'intercepteur de requête:', error);
-    return Promise.reject(error);
+// Intercepteur pour ajouter le token à chaque requête
+api.interceptors.request.use(async (config) => {
+  const token = await AsyncStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
 // Intercepteur pour gérer les réponses
 api.interceptors.response.use(
@@ -61,19 +47,97 @@ api.interceptors.response.use(
 // Service d'authentification
 export const authService = {
   register: async (userData: { email: string; password: string; username: string }) => {
-    const response = await api.post('/users/register', userData);
-    return response.data;
+    try {
+      console.log('📤 Envoi de la requête d\'inscription:', { ...userData, password: '[REDACTED]' });
+      const response = await api.post('/users/register', userData);
+      console.log('📥 Réponse d\'inscription reçue:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'inscription:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   login: async (credentials: { email: string; password: string }) => {
-    const response = await api.post('/users/login', credentials);
-    return response.data;
+    try {
+      console.log('📤 Envoi de la requête de connexion:', { email: credentials.email });
+      const response = await api.post('/users/login', credentials);
+      console.log('📥 Réponse de connexion reçue:', response.data);
+      
+      if (!response.data || !response.data.token || !response.data._id) {
+        console.error('❌ Réponse invalide du serveur:', response.data);
+        throw new Error('Réponse invalide du serveur');
+      }
+
+      // S'assurer que tous les champs requis sont présents
+      const userData = {
+        _id: response.data._id,
+        email: response.data.email,
+        username: response.data.username,
+        profilePicture: response.data.profilePicture || '',
+        location: response.data.location || { type: 'Point', coordinates: [0, 0] },
+        bio: response.data.bio || '',
+        token: response.data.token
+      };
+      
+      console.log('✅ Données utilisateur validées:', userData);
+      return userData;
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la connexion:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   updateProfile: async (profileData: { username?: string; profilePicture?: string; location?: any }) => {
     const response = await api.put('/users/profile', profileData);
     return response.data;
   },
+
+  deleteProfile: async () => {
+    const response = await api.delete('/users/profile');
+    return response.data;
+  }
+};
+
+// Service de gestion des amis
+export const friendService = {
+  sendFriendRequest: async (userId: string) => {
+    const response = await api.post(`/users/friends/request/${userId}`);
+    return response.data;
+  },
+
+  handleFriendRequest: async (requestId: string, action: 'accept' | 'reject') => {
+    const response = await api.put(`/users/friends/request/${requestId}`, { action });
+    return response.data;
+  },
+
+  getFriends: async () => {
+    const response = await api.get('/users/friends');
+    return response.data;
+  },
+
+  getFriendRequests: async () => {
+    const response = await api.get('/users/friends/requests');
+    return response.data;
+  },
+
+  removeFriend: async (userId: string) => {
+    const response = await api.delete(`/users/friends/${userId}`);
+    return response.data;
+  }
+};
+
+// Service de recherche d'utilisateurs
+export const userService = {
+  searchUsers: async (query: string) => {
+    const response = await api.get(`/users/search?query=${query}`);
+    return response.data;
+  },
+
+  findNearbyUsers: async (latitude: number, longitude: number, maxDistance: number = 5000) => {
+    const response = await api.get(`/users/nearby?latitude=${latitude}&longitude=${longitude}&maxDistance=${maxDistance}`);
+    return response.data;
+  }
 };
 
 // Service de messages
@@ -118,25 +182,7 @@ export const messageService = {
     const response = await api.put(`/messages/read/${messageId}`);
     console.log('✅ Message marqué comme lu:', response.data);
     return response.data;
-  },
-};
-
-// Service d'utilisateurs
-export const userService = {
-  searchUsers: async (query: string) => {
-    const response = await api.get(`/users/search?query=${query}`);
-    return response.data;
-  },
-
-  findNearbyUsers: async (longitude: number, latitude: number, maxDistance?: number) => {
-    const response = await api.get(`/users/nearby?longitude=${longitude}&latitude=${latitude}&maxDistance=${maxDistance || 5000}`);
-    return response.data;
-  },
-
-  addFriend: async (friendId: string) => {
-    const response = await api.post('/users/friends', { friendId });
-    return response.data;
-  },
+  }
 };
 
 export default api; 
