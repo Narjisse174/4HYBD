@@ -9,9 +9,10 @@ router.post('/login', userController.login);
 router.post('/reset-password', userController.resetPassword);
 
 // Routes protégées
+router.get('/profile', auth, userController.getProfile);
+router.put('/profile', auth, userController.updateProfile);
 router.get('/search', auth, userController.searchUsers);
 router.get('/nearby', auth, userController.findNearbyUsers);
-router.put('/profile', auth, userController.updateProfile);
 router.delete('/profile', auth, userController.deleteProfile);
 
 // Routes pour la gestion des amis
